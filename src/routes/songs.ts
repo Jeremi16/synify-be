@@ -735,6 +735,93 @@ async function enrichArtistMetadata(name: string): Promise<{ avatarUrl: string |
     return { avatarUrl: null, genres: [] };
 }
 
+function normalizeKey(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/\(.*?\)/g, ' ')
+        .replace(/\[.*?\]/g, ' ')
+        .replace(/feat\.?|ft\.?/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function normalizeArtists(value: string): string {
+    const raw = value
+        .replace(/\(.*?\)/g, ' ')
+        .replace(/\[.*?\]/g, ' ')
+        .replace(/feat\.?|ft\.?/gi, ' ')
+        .replace(/[^a-zA-Z0-9&xX, ]+/g, ' ');
+
+    const parts = raw
+        .split(/,|&| x | X | and /g)
+        .map((p) => normalizeKey(p))
+        .filter(Boolean)
+        .sort();
+
+    return parts.join(' ');
+}
+
+/**
+ * POST /songs/exists
+ * Body: { items: [{ title: string; artists: string[] }] }
+ * Return: { results: boolean[] }
+ */
+router.post('/exists', requireAuth, async (req: Request, res: Response) => {
+    const items = req.body?.items;
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'items wajib diisi.' });
+    }
+
+    try {
+        const songs = await prisma.song.findMany({
+            select: {
+                title: true,
+                artists: { select: { name: true } },
+            },
+        });
+
+        const existingKeys = new Set(
+            songs.map((song) => {
+                const title = normalizeKey(song.title || '');
+                const artists = normalizeArtists(song.artists?.map(a => a.name).join(' ') || '');
+                return `${title}|${artists}`;
+            })
+        );
+        const titleToArtistTokens = new Map<string, Set<string>>();
+        for (const song of songs) {
+            const title = normalizeKey(song.title || '');
+            const artists = normalizeArtists(song.artists?.map(a => a.name).join(' ') || '');
+            const tokens = new Set(artists.split(' ').filter(Boolean));
+            if (!titleToArtistTokens.has(title)) {
+                titleToArtistTokens.set(title, tokens);
+            } else {
+                const prev = titleToArtistTokens.get(title)!;
+                for (const t of tokens) prev.add(t);
+            }
+        }
+
+        const results = items.map((item: any) => {
+            const title = normalizeKey(item?.title || '');
+            const rawArtists = Array.isArray(item?.artists) ? item.artists.join(' ') : String(item?.artists || '');
+            const artists = normalizeArtists(rawArtists);
+            const exact = existingKeys.has(`${title}|${artists}`);
+            if (exact) return true;
+            const tokenSet = titleToArtistTokens.get(title);
+            if (!tokenSet) return false;
+            const incomingTokens = new Set(artists.split(' ').filter(Boolean));
+            for (const t of incomingTokens) {
+                if (tokenSet.has(t)) return true;
+            }
+            return false;
+        });
+
+        return res.json({ results });
+    } catch (err) {
+        console.error('[POST /songs/exists]', err);
+        return res.status(500).json({ error: 'Gagal cek lagu.' });
+    }
+});
+
 /**
  * POST /songs/yt-preview
  * (ADMIN ONLY) Ambil info youtube dan bersihkan metadata via AI sebelum download.
