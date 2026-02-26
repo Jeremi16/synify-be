@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String        @id @default(cuid())
+  googleId    String?       @unique
+  email       String        @unique
+  name        String
+  avatarUrl   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  role        String        @default("USER")
+  playHistory PlayHistory[]
+  playlists   Playlist[]
+}
+
+model Artist {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  bio       String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  albums    Album[]
+  songs     Song[]
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  title       String
+  releaseYear Int?
+  coverUrl    String?
+  artistId    String
+  createdAt   DateTime @default(now())
+  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  songs       Song[]
+
+  @@index([artistId])
+}
+
+model Song {
+  id            String         @id @default(cuid())
+  title         String
+  durationSec   Int
+  audioKey      String
+  coverUrl      String?
+  trackNumber   Int?
+  albumId       String?
+  genre         String?
+  playCount     Int            @default(0)
+  lyrics        String?        @db.Text
+  lyricsLrc     String?        @db.Text
+  moods         String[]
+  createdAt     DateTime       @default(now())
+  playHistory   PlayHistory[]
+  playlistItems PlaylistItem[]
+  album         Album?         @relation(fields: [albumId], references: [id])
+  artists       Artist[]
+
+  @@index([title])
+  @@index([playCount(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Playlist {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  coverUrl    String?
+  userId      String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       PlaylistItem[]
+
+  @@index([userId])
+}
+
+model PlaylistItem {
+  id         String   @id @default(cuid())
+  playlistId String
+  songId     String
+  position   Int
+  addedAt    DateTime @default(now())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  song       Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, songId])
+  @@index([playlistId, position])
+}
+
+model PlayHistory {
+  id       String   @id @default(cuid())
+  userId   String
+  songId   String
+  playedAt DateTime @default(now())
+  song     Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, playedAt(sort: Desc)])
+}

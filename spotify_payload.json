@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "status": 200,
+  "author": "Feri",
+  "data": {
+    "title": "Jika Bersamamu",
+    "artist": "Timun Jelita",
+    "thumbnail": "https://i.scdn.co/image/ab67616d00001e028af75952305b37f4199582bd",
+    "album": {
+      "images": [
+        {
+          "url": "https://i.scdn.co/image/ab67616d00001e028af75952305b37f4199582bd"
+        }
+      ]
+    }
+  },
+  "download": "https://rapid.dlapi.app/download/tracks/3934645?api=12&expires=1771996664&format=mp3&name=SmlrYSBCZXJzYW1hbXUubXAz&signature=960b94e20cbf5b28f0a088e7f49e2e12d0b27797bc11d29b0f07bd4659a5d35e"
+}
